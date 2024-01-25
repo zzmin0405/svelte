@@ -1,10 +1,38 @@
 <script>
-  import ContactCard from "./ContactCard.svelte";
+  import { dirty_components, identity } from "svelte/internal";
+import ContactCard from "./ContactCard.svelte";
 
   let name = "Max";
   let title = "";
   let image = "";
   let description = "";
+  let formState = 'empty';
+
+  let createContacts =[];
+  function addContact(){
+    if(
+      name.trim().length ==0 ||
+      title.trim().length ==0 || 
+      image.trim().length==0 || 
+      description.trim().length ==0
+    ) { formState = 'invalid';
+    return;
+  }
+  createContacts =[...createContacts,{
+    id: Math.random(),
+    name: name, 
+    jobTitle:title, 
+    imageUrl:image,
+    desc:description
+  }];
+  formState="done";
+  }
+  function deleteFirst(){
+    createContacts = createContacts.slice(1);
+  }
+  function deleteLast(){
+    createContacts = createContacts.slice(0,-1);
+  }
 </script>
 
 <style>
@@ -32,5 +60,25 @@
     <textarea rows="3" bind:value={description} id="desc" />
   </div>
 </div>
+<button on:click={addContact}>Add Contact Card</button>
+<button on:click={deleteFirst}>delete 1st Contact</button>
+<button on:click={deleteLast}>delete last Contact</button>
 
-<ContactCard userName={name} jobTitle={title} {description} userImage={image} />
+
+
+{#if formState ==='invalid'}
+<p>Invalid input.</p>
+{:else}
+<p>please enter some data and hit the button !</p>
+{/if}
+{#each createContacts as contact, i (contact.id)}
+<h2># {i + 1}</h2>
+<ContactCard 
+  userName={contact.name} 
+  jobTitle={contact.jobTitle} 
+  description={contact.desc} 
+  userImage={contact.imageUrl} 
+  />
+{:else}
+<p>Please start adding some contacts</p>
+{/each}
