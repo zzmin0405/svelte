@@ -1,84 +1,30 @@
 <script>
-  import { dirty_components, identity } from "svelte/internal";
-import ContactCard from "./ContactCard.svelte";
-
-  let name = "Max";
-  let title = "";
-  let image = "";
-  let description = "";
-  let formState = 'empty';
-
-  let createContacts =[];
-  function addContact(){
-    if(
-      name.trim().length ==0 ||
-      title.trim().length ==0 || 
-      image.trim().length==0 || 
-      description.trim().length ==0
-    ) { formState = 'invalid';
-    return;
-  }
-  createContacts =[...createContacts,{
-    id: Math.random(),
-    name: name, 
-    jobTitle:title, 
-    imageUrl:image,
-    desc:description
-  }];
-  formState="done";
-  }
-  function deleteFirst(){
-    createContacts = createContacts.slice(1);
-  }
-  function deleteLast(){
-    createContacts = createContacts.slice(0,-1);
-  }
+    import Header from "./UI/Header.svelte";
+    import MeetUpItemts from "./MeetUps/MeetUpItems.svelte";
+    const meetups =[
+        {id:'m1',
+        title: 'COding Bootcamp',
+        subtitle:'Learn Hard',
+        imageUrl:"https://i.namu.wiki/i/pcuapOq_pmNJ-l3XnG1-5y-FawoBIe9NV6Xs8n8s4l9NxmbdzN34XJxhpm1iy6uWMK2MMcxPtD9_S3Wv1HGQxw.webp",
+        adrees:'부산광역시 어쩌구저쩌구',
+        contactEmail: '111111.com'
+        },
+        {id:'m2',
+        title: 'C0ding Bootcamp',
+        subtitle:'Learn Hard! ! ! !',
+        adrees:'부산광역시 어쩌구저쩌구',
+        contactEmail: '1132231.com'
+        }
+    ]
 </script>
-
 <style>
-  #form {
-    width: 30rem;
-    max-width: 100%;
-  }
+    #meetups{
+        margin-top:5rem ;
+    }
 </style>
-
-<div id="form">
-  <div class="form-control">
-    <label for="userName">User Name</label>
-    <input type="text" bind:value={name} id="userName" />
-  </div>
-  <div class="form-control">
-    <label for="jobTitle">Job Title</label>
-    <input type="text" bind:value={title} id="jobTitle" />
-  </div>
-  <div class="form-control">
-    <label for="image">Image URL</label>
-    <input type="text" bind:value={image} id="image" />
-  </div>
-  <div class="form-control">
-    <label for="desc">Description</label>
-    <textarea rows="3" bind:value={description} id="desc" />
-  </div>
-</div>
-<button on:click={addContact}>Add Contact Card</button>
-<button on:click={deleteFirst}>delete 1st Contact</button>
-<button on:click={deleteLast}>delete last Contact</button>
-
-
-
-{#if formState ==='invalid'}
-<p>Invalid input.</p>
-{:else}
-<p>please enter some data and hit the button !</p>
-{/if}
-{#each createContacts as contact, i (contact.id)}
-<h2># {i + 1}</h2>
-<ContactCard 
-  userName={contact.name} 
-  jobTitle={contact.jobTitle} 
-  description={contact.desc} 
-  userImage={contact.imageUrl} 
-  />
-{:else}
-<p>Please start adding some contacts</p>
+<Header />
+<section id="meetups">
+    {#each meetups as meetup}
+    <MeetUpItemts />
 {/each}
+</section>

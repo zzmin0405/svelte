@@ -4,7 +4,6 @@ var app = (function () {
     'use strict';
 
     function noop() { }
-    const identity = x => x;
     function add_location(element, file, line, column, char) {
         element.__svelte_meta = {
             loc: { file, line, column, char }
@@ -47,6 +46,12 @@ var app = (function () {
             node.parentNode.removeChild(node);
         }
     }
+    function destroy_each(iterations, detaching) {
+        for (let i = 0; i < iterations.length; i += 1) {
+            if (iterations[i])
+                iterations[i].d(detaching);
+        }
+    }
     function element(name) {
         return document.createElement(name);
     }
@@ -56,13 +61,6 @@ var app = (function () {
     function space() {
         return text(' ');
     }
-    function empty() {
-        return text('');
-    }
-    function listen(node, event, handler, options) {
-        node.addEventListener(event, handler, options);
-        return () => node.removeEventListener(event, handler, options);
-    }
     function attr(node, attribute, value) {
         if (value == null)
             node.removeAttribute(attribute);
@@ -71,12 +69,6 @@ var app = (function () {
     }
     function children(element) {
         return Array.from(element.childNodes);
-    }
-    function set_input_value(input, value) {
-        input.value = value == null ? '' : value;
-    }
-    function toggle_class(element, name, toggle) {
-        element.classList[toggle ? 'add' : 'remove'](name);
     }
     function custom_event(type, detail, { bubbles = false, cancelable = false } = {}) {
         const e = document.createEvent('CustomEvent');
@@ -196,19 +188,6 @@ var app = (function () {
     }
     const outroing = new Set();
     let outros;
-    function group_outros() {
-        outros = {
-            r: 0,
-            c: [],
-            p: outros // parent group
-        };
-    }
-    function check_outros() {
-        if (!outros.r) {
-            run_all(outros.c);
-        }
-        outros = outros.p;
-    }
     function transition_in(block, local) {
         if (block && block.i) {
             outroing.delete(block);
@@ -232,99 +211,6 @@ var app = (function () {
         }
         else if (callback) {
             callback();
-        }
-    }
-    function outro_and_destroy_block(block, lookup) {
-        transition_out(block, 1, 1, () => {
-            lookup.delete(block.key);
-        });
-    }
-    function update_keyed_each(old_blocks, dirty, get_key, dynamic, ctx, list, lookup, node, destroy, create_each_block, next, get_context) {
-        let o = old_blocks.length;
-        let n = list.length;
-        let i = o;
-        const old_indexes = {};
-        while (i--)
-            old_indexes[old_blocks[i].key] = i;
-        const new_blocks = [];
-        const new_lookup = new Map();
-        const deltas = new Map();
-        const updates = [];
-        i = n;
-        while (i--) {
-            const child_ctx = get_context(ctx, list, i);
-            const key = get_key(child_ctx);
-            let block = lookup.get(key);
-            if (!block) {
-                block = create_each_block(key, child_ctx);
-                block.c();
-            }
-            else if (dynamic) {
-                // defer updates until all the DOM shuffling is done
-                updates.push(() => block.p(child_ctx, dirty));
-            }
-            new_lookup.set(key, new_blocks[i] = block);
-            if (key in old_indexes)
-                deltas.set(key, Math.abs(i - old_indexes[key]));
-        }
-        const will_move = new Set();
-        const did_move = new Set();
-        function insert(block) {
-            transition_in(block, 1);
-            block.m(node, next);
-            lookup.set(block.key, block);
-            next = block.first;
-            n--;
-        }
-        while (o && n) {
-            const new_block = new_blocks[n - 1];
-            const old_block = old_blocks[o - 1];
-            const new_key = new_block.key;
-            const old_key = old_block.key;
-            if (new_block === old_block) {
-                // do nothing
-                next = new_block.first;
-                o--;
-                n--;
-            }
-            else if (!new_lookup.has(old_key)) {
-                // remove old block
-                destroy(old_block, lookup);
-                o--;
-            }
-            else if (!lookup.has(new_key) || will_move.has(new_key)) {
-                insert(new_block);
-            }
-            else if (did_move.has(old_key)) {
-                o--;
-            }
-            else if (deltas.get(new_key) > deltas.get(old_key)) {
-                did_move.add(new_key);
-                insert(new_block);
-            }
-            else {
-                will_move.add(old_key);
-                o--;
-            }
-        }
-        while (o--) {
-            const old_block = old_blocks[o];
-            if (!new_lookup.has(old_block.key))
-                destroy(old_block, lookup);
-        }
-        while (n)
-            insert(new_blocks[n - 1]);
-        run_all(updates);
-        return new_blocks;
-    }
-    function validate_each_keys(ctx, list, get_context, get_key) {
-        const keys = new Set();
-        for (let i = 0; i < list.length; i++) {
-            const key = get_key(get_context(ctx, list, i));
-            if (keys.has(key)) {
-                throw new Error('Cannot have duplicate keys in a keyed each');
-            }
-            keys.add(key);
         }
     }
     function create_component(block) {
@@ -478,34 +364,12 @@ var app = (function () {
         dispatch_dev('SvelteDOMRemove', { node });
         detach(node);
     }
-    function listen_dev(node, event, handler, options, has_prevent_default, has_stop_propagation, has_stop_immediate_propagation) {
-        const modifiers = options === true ? ['capture'] : options ? Array.from(Object.keys(options)) : [];
-        if (has_prevent_default)
-            modifiers.push('preventDefault');
-        if (has_stop_propagation)
-            modifiers.push('stopPropagation');
-        if (has_stop_immediate_propagation)
-            modifiers.push('stopImmediatePropagation');
-        dispatch_dev('SvelteDOMAddEventListener', { node, event, handler, modifiers });
-        const dispose = listen(node, event, handler, options);
-        return () => {
-            dispatch_dev('SvelteDOMRemoveEventListener', { node, event, handler, modifiers });
-            dispose();
-        };
-    }
     function attr_dev(node, attribute, value) {
         attr(node, attribute, value);
         if (value == null)
             dispatch_dev('SvelteDOMRemoveAttribute', { node, attribute });
         else
             dispatch_dev('SvelteDOMSetAttribute', { node, attribute, value });
-    }
-    function set_data_dev(text, data) {
-        data = '' + data;
-        if (text.data === data)
-            return;
-        dispatch_dev('SvelteDOMSetData', { node: text, data });
-        text.data = data;
     }
     function validate_each_argument(arg) {
         if (typeof arg !== 'string' && !(arg && typeof arg === 'object' && 'length' in arg)) {
@@ -543,113 +407,170 @@ var app = (function () {
         $inject_state() { }
     }
 
-    /* src\ContactCard.svelte generated by Svelte v3.59.2 */
+    /* src\UI\Header.svelte generated by Svelte v3.59.2 */
 
-    const file$1 = "src\\ContactCard.svelte";
+    const file$2 = "src\\UI\\Header.svelte";
 
-    function create_fragment$1(ctx) {
-    	let div3;
+    function create_fragment$2(ctx) {
     	let header;
-    	let div0;
-    	let img;
-    	let img_src_value;
-    	let t0;
-    	let div1;
     	let h1;
-    	let t1;
-    	let t2;
-    	let t3;
-    	let t4;
-    	let h2;
-    	let t5;
-    	let t6;
-    	let div2;
-    	let p;
-    	let t7;
 
     	const block = {
     		c: function create() {
-    			div3 = element("div");
     			header = element("header");
-    			div0 = element("div");
-    			img = element("img");
-    			t0 = space();
-    			div1 = element("div");
     			h1 = element("h1");
-    			t1 = text(/*userName*/ ctx[0]);
-    			t2 = text(" / ");
-    			t3 = text(/*initialName*/ ctx[4]);
-    			t4 = space();
-    			h2 = element("h2");
-    			t5 = text(/*jobTitle*/ ctx[1]);
-    			t6 = space();
-    			div2 = element("div");
-    			p = element("p");
-    			t7 = text(/*description*/ ctx[2]);
-    			if (!src_url_equal(img.src, img_src_value = /*userImage*/ ctx[3])) attr_dev(img, "src", img_src_value);
-    			attr_dev(img, "alt", /*userName*/ ctx[0]);
-    			attr_dev(img, "class", "svelte-p7z0xn");
-    			add_location(img, file$1, 71, 6, 1219);
-    			attr_dev(div0, "class", "thumb svelte-p7z0xn");
-    			toggle_class(div0, "thumb-placeholder", !/*userImage*/ ctx[3]);
-    			add_location(div0, file$1, 70, 4, 1153);
-    			attr_dev(h1, "class", "svelte-p7z0xn");
-    			add_location(h1, file$1, 74, 6, 1306);
-    			attr_dev(h2, "class", "svelte-p7z0xn");
-    			add_location(h2, file$1, 75, 6, 1349);
-    			attr_dev(div1, "class", "user-data svelte-p7z0xn");
-    			add_location(div1, file$1, 73, 4, 1275);
-    			attr_dev(header, "class", "svelte-p7z0xn");
-    			add_location(header, file$1, 69, 2, 1139);
-    			add_location(p, file$1, 79, 4, 1428);
-    			attr_dev(div2, "class", "description svelte-p7z0xn");
-    			add_location(div2, file$1, 78, 2, 1397);
-    			attr_dev(div3, "class", "contact-card svelte-p7z0xn");
-    			add_location(div3, file$1, 68, 0, 1109);
+    			h1.textContent = "MeetUs";
+    			attr_dev(h1, "class", "svelte-vvzwj5");
+    			add_location(h1, file$2, 20, 4, 436);
+    			attr_dev(header, "class", "svelte-vvzwj5");
+    			add_location(header, file$2, 19, 0, 422);
     		},
     		l: function claim(nodes) {
     			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
     		},
     		m: function mount(target, anchor) {
-    			insert_dev(target, div3, anchor);
-    			append_dev(div3, header);
-    			append_dev(header, div0);
-    			append_dev(div0, img);
-    			append_dev(header, t0);
-    			append_dev(header, div1);
-    			append_dev(div1, h1);
-    			append_dev(h1, t1);
-    			append_dev(h1, t2);
-    			append_dev(h1, t3);
-    			append_dev(div1, t4);
-    			append_dev(div1, h2);
-    			append_dev(h2, t5);
-    			append_dev(div3, t6);
-    			append_dev(div3, div2);
-    			append_dev(div2, p);
-    			append_dev(p, t7);
+    			insert_dev(target, header, anchor);
+    			append_dev(header, h1);
     		},
-    		p: function update(ctx, [dirty]) {
-    			if (dirty & /*userImage*/ 8 && !src_url_equal(img.src, img_src_value = /*userImage*/ ctx[3])) {
-    				attr_dev(img, "src", img_src_value);
-    			}
-
-    			if (dirty & /*userName*/ 1) {
-    				attr_dev(img, "alt", /*userName*/ ctx[0]);
-    			}
-
-    			if (dirty & /*userImage*/ 8) {
-    				toggle_class(div0, "thumb-placeholder", !/*userImage*/ ctx[3]);
-    			}
-
-    			if (dirty & /*userName*/ 1) set_data_dev(t1, /*userName*/ ctx[0]);
-    			if (dirty & /*jobTitle*/ 2) set_data_dev(t5, /*jobTitle*/ ctx[1]);
-    			if (dirty & /*description*/ 4) set_data_dev(t7, /*description*/ ctx[2]);
-    		},
+    		p: noop,
     		i: noop,
     		o: noop,
     		d: function destroy(detaching) {
-    			if (detaching) detach_dev(div3);
+    			if (detaching) detach_dev(header);
+    		}
+    	};
+
+    	dispatch_dev("SvelteRegisterBlock", {
+    		block,
+    		id: create_fragment$2.name,
+    		type: "component",
+    		source: "",
+    		ctx
+    	});
+
+    	return block;
+    }
+
+    function instance$2($$self, $$props) {
+    	let { $$slots: slots = {}, $$scope } = $$props;
+    	validate_slots('Header', slots, []);
+    	const writable_props = [];
+
+    	Object.keys($$props).forEach(key => {
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<Header> was created with unknown prop '${key}'`);
+    	});
+
+    	return [];
+    }
+
+    class Header extends SvelteComponentDev {
+    	constructor(options) {
+    		super(options);
+    		init(this, options, instance$2, create_fragment$2, safe_not_equal, {});
+
+    		dispatch_dev("SvelteRegisterComponent", {
+    			component: this,
+    			tagName: "Header",
+    			options,
+    			id: create_fragment$2.name
+    		});
+    	}
+    }
+
+    /* src\MeetUps\MeetUpItems.svelte generated by Svelte v3.59.2 */
+
+    const file$1 = "src\\MeetUps\\MeetUpItems.svelte";
+
+    function create_fragment$1(ctx) {
+    	let article;
+    	let header;
+    	let h1;
+    	let t1;
+    	let h2;
+    	let t3;
+    	let div0;
+    	let img;
+    	let img_src_value;
+    	let t4;
+    	let div1;
+    	let p;
+    	let t5;
+    	let footer;
+    	let button0;
+    	let t7;
+    	let button1;
+
+    	const block = {
+    		c: function create() {
+    			article = element("article");
+    			header = element("header");
+    			h1 = element("h1");
+    			h1.textContent = "TITLE";
+    			t1 = space();
+    			h2 = element("h2");
+    			h2.textContent = "SUBTITLE";
+    			t3 = space();
+    			div0 = element("div");
+    			img = element("img");
+    			t4 = space();
+    			div1 = element("div");
+    			p = element("p");
+    			t5 = space();
+    			footer = element("footer");
+    			button0 = element("button");
+    			button0.textContent = "Show Details";
+    			t7 = space();
+    			button1 = element("button");
+    			button1.textContent = "Favorite";
+    			attr_dev(h1, "class", "svelte-8tjse");
+    			add_location(h1, file$1, 56, 4, 735);
+    			attr_dev(h2, "class", "svelte-8tjse");
+    			add_location(h2, file$1, 57, 4, 754);
+    			attr_dev(header, "class", "svelte-8tjse");
+    			add_location(header, file$1, 55, 2, 722);
+    			if (!src_url_equal(img.src, img_src_value = "")) attr_dev(img, "src", img_src_value);
+    			attr_dev(img, "alt", "");
+    			attr_dev(img, "class", "svelte-8tjse");
+    			add_location(img, file$1, 60, 4, 810);
+    			attr_dev(div0, "class", "image svelte-8tjse");
+    			add_location(div0, file$1, 59, 2, 786);
+    			attr_dev(p, "class", "svelte-8tjse");
+    			add_location(p, file$1, 63, 4, 869);
+    			attr_dev(div1, "class", "content svelte-8tjse");
+    			add_location(div1, file$1, 62, 2, 843);
+    			add_location(button0, file$1, 66, 4, 899);
+    			add_location(button1, file$1, 67, 4, 933);
+    			attr_dev(footer, "class", "svelte-8tjse");
+    			add_location(footer, file$1, 65, 2, 886);
+    			attr_dev(article, "class", "svelte-8tjse");
+    			add_location(article, file$1, 54, 0, 710);
+    		},
+    		l: function claim(nodes) {
+    			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
+    		},
+    		m: function mount(target, anchor) {
+    			insert_dev(target, article, anchor);
+    			append_dev(article, header);
+    			append_dev(header, h1);
+    			append_dev(header, t1);
+    			append_dev(header, h2);
+    			append_dev(article, t3);
+    			append_dev(article, div0);
+    			append_dev(div0, img);
+    			append_dev(article, t4);
+    			append_dev(article, div1);
+    			append_dev(div1, p);
+    			append_dev(article, t5);
+    			append_dev(article, footer);
+    			append_dev(footer, button0);
+    			append_dev(footer, t7);
+    			append_dev(footer, button1);
+    		},
+    		p: noop,
+    		i: noop,
+    		o: noop,
+    		d: function destroy(detaching) {
+    			if (detaching) detach_dev(article);
     		}
     	};
 
@@ -664,117 +585,29 @@ var app = (function () {
     	return block;
     }
 
-    function instance$1($$self, $$props, $$invalidate) {
+    function instance$1($$self, $$props) {
     	let { $$slots: slots = {}, $$scope } = $$props;
-    	validate_slots('ContactCard', slots, []);
-    	let { userName } = $$props;
-    	let { jobTitle } = $$props;
-    	let { description } = $$props;
-    	let { userImage } = $$props;
-    	const initialName = userName;
-
-    	$$self.$$.on_mount.push(function () {
-    		if (userName === undefined && !('userName' in $$props || $$self.$$.bound[$$self.$$.props['userName']])) {
-    			console.warn("<ContactCard> was created without expected prop 'userName'");
-    		}
-
-    		if (jobTitle === undefined && !('jobTitle' in $$props || $$self.$$.bound[$$self.$$.props['jobTitle']])) {
-    			console.warn("<ContactCard> was created without expected prop 'jobTitle'");
-    		}
-
-    		if (description === undefined && !('description' in $$props || $$self.$$.bound[$$self.$$.props['description']])) {
-    			console.warn("<ContactCard> was created without expected prop 'description'");
-    		}
-
-    		if (userImage === undefined && !('userImage' in $$props || $$self.$$.bound[$$self.$$.props['userImage']])) {
-    			console.warn("<ContactCard> was created without expected prop 'userImage'");
-    		}
-    	});
-
-    	const writable_props = ['userName', 'jobTitle', 'description', 'userImage'];
+    	validate_slots('MeetUpItems', slots, []);
+    	const writable_props = [];
 
     	Object.keys($$props).forEach(key => {
-    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<ContactCard> was created with unknown prop '${key}'`);
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<MeetUpItems> was created with unknown prop '${key}'`);
     	});
 
-    	$$self.$$set = $$props => {
-    		if ('userName' in $$props) $$invalidate(0, userName = $$props.userName);
-    		if ('jobTitle' in $$props) $$invalidate(1, jobTitle = $$props.jobTitle);
-    		if ('description' in $$props) $$invalidate(2, description = $$props.description);
-    		if ('userImage' in $$props) $$invalidate(3, userImage = $$props.userImage);
-    	};
-
-    	$$self.$capture_state = () => ({
-    		userName,
-    		jobTitle,
-    		description,
-    		userImage,
-    		initialName
-    	});
-
-    	$$self.$inject_state = $$props => {
-    		if ('userName' in $$props) $$invalidate(0, userName = $$props.userName);
-    		if ('jobTitle' in $$props) $$invalidate(1, jobTitle = $$props.jobTitle);
-    		if ('description' in $$props) $$invalidate(2, description = $$props.description);
-    		if ('userImage' in $$props) $$invalidate(3, userImage = $$props.userImage);
-    	};
-
-    	if ($$props && "$$inject" in $$props) {
-    		$$self.$inject_state($$props.$$inject);
-    	}
-
-    	return [userName, jobTitle, description, userImage, initialName];
+    	return [];
     }
 
-    class ContactCard extends SvelteComponentDev {
+    class MeetUpItems extends SvelteComponentDev {
     	constructor(options) {
     		super(options);
-
-    		init(this, options, instance$1, create_fragment$1, safe_not_equal, {
-    			userName: 0,
-    			jobTitle: 1,
-    			description: 2,
-    			userImage: 3
-    		});
+    		init(this, options, instance$1, create_fragment$1, safe_not_equal, {});
 
     		dispatch_dev("SvelteRegisterComponent", {
     			component: this,
-    			tagName: "ContactCard",
+    			tagName: "MeetUpItems",
     			options,
     			id: create_fragment$1.name
     		});
-    	}
-
-    	get userName() {
-    		throw new Error("<ContactCard>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
-    	}
-
-    	set userName(value) {
-    		throw new Error("<ContactCard>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
-    	}
-
-    	get jobTitle() {
-    		throw new Error("<ContactCard>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
-    	}
-
-    	set jobTitle(value) {
-    		throw new Error("<ContactCard>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
-    	}
-
-    	get description() {
-    		throw new Error("<ContactCard>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
-    	}
-
-    	set description(value) {
-    		throw new Error("<ContactCard>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
-    	}
-
-    	get userImage() {
-    		throw new Error("<ContactCard>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
-    	}
-
-    	set userImage(value) {
-    		throw new Error("<ContactCard>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
     	}
     }
 
@@ -783,162 +616,35 @@ var app = (function () {
 
     function get_each_context(ctx, list, i) {
     	const child_ctx = ctx.slice();
-    	child_ctx[13] = list[i];
-    	child_ctx[15] = i;
+    	child_ctx[1] = list[i];
     	return child_ctx;
     }
 
-    // (71:0) {:else}
-    function create_else_block_1(ctx) {
-    	let p;
-
-    	const block = {
-    		c: function create() {
-    			p = element("p");
-    			p.textContent = "please enter some data and hit the button !";
-    			add_location(p, file, 71, 0, 1765);
-    		},
-    		m: function mount(target, anchor) {
-    			insert_dev(target, p, anchor);
-    		},
-    		d: function destroy(detaching) {
-    			if (detaching) detach_dev(p);
-    		}
-    	};
-
-    	dispatch_dev("SvelteRegisterBlock", {
-    		block,
-    		id: create_else_block_1.name,
-    		type: "else",
-    		source: "(71:0) {:else}",
-    		ctx
-    	});
-
-    	return block;
-    }
-
-    // (69:0) {#if formState ==='invalid'}
-    function create_if_block(ctx) {
-    	let p;
-
-    	const block = {
-    		c: function create() {
-    			p = element("p");
-    			p.textContent = "Invalid input.";
-    			add_location(p, file, 69, 0, 1733);
-    		},
-    		m: function mount(target, anchor) {
-    			insert_dev(target, p, anchor);
-    		},
-    		d: function destroy(detaching) {
-    			if (detaching) detach_dev(p);
-    		}
-    	};
-
-    	dispatch_dev("SvelteRegisterBlock", {
-    		block,
-    		id: create_if_block.name,
-    		type: "if",
-    		source: "(69:0) {#if formState ==='invalid'}",
-    		ctx
-    	});
-
-    	return block;
-    }
-
-    // (82:0) {:else}
-    function create_else_block(ctx) {
-    	let p;
-
-    	const block = {
-    		c: function create() {
-    			p = element("p");
-    			p.textContent = "Please start adding some contacts";
-    			add_location(p, file, 82, 0, 2049);
-    		},
-    		m: function mount(target, anchor) {
-    			insert_dev(target, p, anchor);
-    		},
-    		p: noop,
-    		d: function destroy(detaching) {
-    			if (detaching) detach_dev(p);
-    		}
-    	};
-
-    	dispatch_dev("SvelteRegisterBlock", {
-    		block,
-    		id: create_else_block.name,
-    		type: "else",
-    		source: "(82:0) {:else}",
-    		ctx
-    	});
-
-    	return block;
-    }
-
-    // (74:0) {#each createContacts as contact, i (contact.id)}
-    function create_each_block(key_1, ctx) {
-    	let h2;
-    	let t0;
-    	let t1_value = /*i*/ ctx[15] + 1 + "";
-    	let t1;
-    	let t2;
-    	let contactcard;
+    // (27:4) {#each meetups as meetup}
+    function create_each_block(ctx) {
+    	let meetupitemts;
     	let current;
-
-    	contactcard = new ContactCard({
-    			props: {
-    				userName: /*contact*/ ctx[13].name,
-    				jobTitle: /*contact*/ ctx[13].jobTitle,
-    				description: /*contact*/ ctx[13].desc,
-    				userImage: /*contact*/ ctx[13].imageUrl
-    			},
-    			$$inline: true
-    		});
+    	meetupitemts = new MeetUpItems({ $$inline: true });
 
     	const block = {
-    		key: key_1,
-    		first: null,
     		c: function create() {
-    			h2 = element("h2");
-    			t0 = text("# ");
-    			t1 = text(t1_value);
-    			t2 = space();
-    			create_component(contactcard.$$.fragment);
-    			add_location(h2, file, 74, 0, 1875);
-    			this.first = h2;
+    			create_component(meetupitemts.$$.fragment);
     		},
     		m: function mount(target, anchor) {
-    			insert_dev(target, h2, anchor);
-    			append_dev(h2, t0);
-    			append_dev(h2, t1);
-    			insert_dev(target, t2, anchor);
-    			mount_component(contactcard, target, anchor);
+    			mount_component(meetupitemts, target, anchor);
     			current = true;
-    		},
-    		p: function update(new_ctx, dirty) {
-    			ctx = new_ctx;
-    			if ((!current || dirty & /*createContacts*/ 32) && t1_value !== (t1_value = /*i*/ ctx[15] + 1 + "")) set_data_dev(t1, t1_value);
-    			const contactcard_changes = {};
-    			if (dirty & /*createContacts*/ 32) contactcard_changes.userName = /*contact*/ ctx[13].name;
-    			if (dirty & /*createContacts*/ 32) contactcard_changes.jobTitle = /*contact*/ ctx[13].jobTitle;
-    			if (dirty & /*createContacts*/ 32) contactcard_changes.description = /*contact*/ ctx[13].desc;
-    			if (dirty & /*createContacts*/ 32) contactcard_changes.userImage = /*contact*/ ctx[13].imageUrl;
-    			contactcard.$set(contactcard_changes);
     		},
     		i: function intro(local) {
     			if (current) return;
-    			transition_in(contactcard.$$.fragment, local);
+    			transition_in(meetupitemts.$$.fragment, local);
     			current = true;
     		},
     		o: function outro(local) {
-    			transition_out(contactcard.$$.fragment, local);
+    			transition_out(meetupitemts.$$.fragment, local);
     			current = false;
     		},
     		d: function destroy(detaching) {
-    			if (detaching) detach_dev(h2);
-    			if (detaching) detach_dev(t2);
-    			destroy_component(contactcard, detaching);
+    			destroy_component(meetupitemts, detaching);
     		}
     	};
 
@@ -946,7 +652,7 @@ var app = (function () {
     		block,
     		id: create_each_block.name,
     		type: "each",
-    		source: "(74:0) {#each createContacts as contact, i (contact.id)}",
+    		source: "(27:4) {#each meetups as meetup}",
     		ctx
     	});
 
@@ -954,264 +660,53 @@ var app = (function () {
     }
 
     function create_fragment(ctx) {
-    	let div4;
-    	let div0;
-    	let label0;
-    	let t1;
-    	let input0;
-    	let t2;
-    	let div1;
-    	let label1;
-    	let t4;
-    	let input1;
-    	let t5;
-    	let div2;
-    	let label2;
-    	let t7;
-    	let input2;
-    	let t8;
-    	let div3;
-    	let label3;
-    	let t10;
-    	let textarea;
-    	let t11;
-    	let button0;
-    	let t13;
-    	let button1;
-    	let t15;
-    	let button2;
-    	let t17;
-    	let t18;
-    	let each_blocks = [];
-    	let each_1_lookup = new Map();
-    	let each_1_anchor;
+    	let header;
+    	let t;
+    	let section;
     	let current;
-    	let mounted;
-    	let dispose;
-
-    	function select_block_type(ctx, dirty) {
-    		if (/*formState*/ ctx[4] === 'invalid') return create_if_block;
-    		return create_else_block_1;
-    	}
-
-    	let current_block_type = select_block_type(ctx);
-    	let if_block = current_block_type(ctx);
-    	let each_value = /*createContacts*/ ctx[5];
+    	header = new Header({ $$inline: true });
+    	let each_value = /*meetups*/ ctx[0];
     	validate_each_argument(each_value);
-    	const get_key = ctx => /*contact*/ ctx[13].id;
-    	validate_each_keys(ctx, each_value, get_each_context, get_key);
+    	let each_blocks = [];
 
     	for (let i = 0; i < each_value.length; i += 1) {
-    		let child_ctx = get_each_context(ctx, each_value, i);
-    		let key = get_key(child_ctx);
-    		each_1_lookup.set(key, each_blocks[i] = create_each_block(key, child_ctx));
-    	}
-
-    	let each_1_else = null;
-
-    	if (!each_value.length) {
-    		each_1_else = create_else_block(ctx);
+    		each_blocks[i] = create_each_block(get_each_context(ctx, each_value, i));
     	}
 
     	const block = {
     		c: function create() {
-    			div4 = element("div");
-    			div0 = element("div");
-    			label0 = element("label");
-    			label0.textContent = "User Name";
-    			t1 = space();
-    			input0 = element("input");
-    			t2 = space();
-    			div1 = element("div");
-    			label1 = element("label");
-    			label1.textContent = "Job Title";
-    			t4 = space();
-    			input1 = element("input");
-    			t5 = space();
-    			div2 = element("div");
-    			label2 = element("label");
-    			label2.textContent = "Image URL";
-    			t7 = space();
-    			input2 = element("input");
-    			t8 = space();
-    			div3 = element("div");
-    			label3 = element("label");
-    			label3.textContent = "Description";
-    			t10 = space();
-    			textarea = element("textarea");
-    			t11 = space();
-    			button0 = element("button");
-    			button0.textContent = "Add Contact Card";
-    			t13 = space();
-    			button1 = element("button");
-    			button1.textContent = "delete 1st Contact";
-    			t15 = space();
-    			button2 = element("button");
-    			button2.textContent = "delete last Contact";
-    			t17 = space();
-    			if_block.c();
-    			t18 = space();
+    			create_component(header.$$.fragment);
+    			t = space();
+    			section = element("section");
 
     			for (let i = 0; i < each_blocks.length; i += 1) {
     				each_blocks[i].c();
     			}
 
-    			each_1_anchor = empty();
-
-    			if (each_1_else) {
-    				each_1_else.c();
-    			}
-
-    			attr_dev(label0, "for", "userName");
-    			add_location(label0, file, 46, 4, 973);
-    			attr_dev(input0, "type", "text");
-    			attr_dev(input0, "id", "userName");
-    			add_location(input0, file, 47, 4, 1018);
-    			attr_dev(div0, "class", "form-control");
-    			add_location(div0, file, 45, 2, 941);
-    			attr_dev(label1, "for", "jobTitle");
-    			add_location(label1, file, 50, 4, 1117);
-    			attr_dev(input1, "type", "text");
-    			attr_dev(input1, "id", "jobTitle");
-    			add_location(input1, file, 51, 4, 1162);
-    			attr_dev(div1, "class", "form-control");
-    			add_location(div1, file, 49, 2, 1085);
-    			attr_dev(label2, "for", "image");
-    			add_location(label2, file, 54, 4, 1262);
-    			attr_dev(input2, "type", "text");
-    			attr_dev(input2, "id", "image");
-    			add_location(input2, file, 55, 4, 1304);
-    			attr_dev(div2, "class", "form-control");
-    			add_location(div2, file, 53, 2, 1230);
-    			attr_dev(label3, "for", "desc");
-    			add_location(label3, file, 58, 4, 1401);
-    			attr_dev(textarea, "rows", "3");
-    			attr_dev(textarea, "id", "desc");
-    			add_location(textarea, file, 59, 4, 1444);
-    			attr_dev(div3, "class", "form-control");
-    			add_location(div3, file, 57, 2, 1369);
-    			attr_dev(div4, "id", "form");
-    			attr_dev(div4, "class", "svelte-pd4ajg");
-    			add_location(div4, file, 44, 0, 922);
-    			add_location(button0, file, 62, 0, 1520);
-    			add_location(button1, file, 63, 0, 1577);
-    			add_location(button2, file, 64, 0, 1637);
+    			attr_dev(section, "id", "meetups");
+    			attr_dev(section, "class", "svelte-1m72mj3");
+    			add_location(section, file, 25, 0, 687);
     		},
     		l: function claim(nodes) {
     			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
     		},
     		m: function mount(target, anchor) {
-    			insert_dev(target, div4, anchor);
-    			append_dev(div4, div0);
-    			append_dev(div0, label0);
-    			append_dev(div0, t1);
-    			append_dev(div0, input0);
-    			set_input_value(input0, /*name*/ ctx[0]);
-    			append_dev(div4, t2);
-    			append_dev(div4, div1);
-    			append_dev(div1, label1);
-    			append_dev(div1, t4);
-    			append_dev(div1, input1);
-    			set_input_value(input1, /*title*/ ctx[1]);
-    			append_dev(div4, t5);
-    			append_dev(div4, div2);
-    			append_dev(div2, label2);
-    			append_dev(div2, t7);
-    			append_dev(div2, input2);
-    			set_input_value(input2, /*image*/ ctx[2]);
-    			append_dev(div4, t8);
-    			append_dev(div4, div3);
-    			append_dev(div3, label3);
-    			append_dev(div3, t10);
-    			append_dev(div3, textarea);
-    			set_input_value(textarea, /*description*/ ctx[3]);
-    			insert_dev(target, t11, anchor);
-    			insert_dev(target, button0, anchor);
-    			insert_dev(target, t13, anchor);
-    			insert_dev(target, button1, anchor);
-    			insert_dev(target, t15, anchor);
-    			insert_dev(target, button2, anchor);
-    			insert_dev(target, t17, anchor);
-    			if_block.m(target, anchor);
-    			insert_dev(target, t18, anchor);
+    			mount_component(header, target, anchor);
+    			insert_dev(target, t, anchor);
+    			insert_dev(target, section, anchor);
 
     			for (let i = 0; i < each_blocks.length; i += 1) {
     				if (each_blocks[i]) {
-    					each_blocks[i].m(target, anchor);
+    					each_blocks[i].m(section, null);
     				}
-    			}
-
-    			insert_dev(target, each_1_anchor, anchor);
-
-    			if (each_1_else) {
-    				each_1_else.m(target, anchor);
     			}
 
     			current = true;
-
-    			if (!mounted) {
-    				dispose = [
-    					listen_dev(input0, "input", /*input0_input_handler*/ ctx[9]),
-    					listen_dev(input1, "input", /*input1_input_handler*/ ctx[10]),
-    					listen_dev(input2, "input", /*input2_input_handler*/ ctx[11]),
-    					listen_dev(textarea, "input", /*textarea_input_handler*/ ctx[12]),
-    					listen_dev(button0, "click", /*addContact*/ ctx[6], false, false, false, false),
-    					listen_dev(button1, "click", /*deleteFirst*/ ctx[7], false, false, false, false),
-    					listen_dev(button2, "click", /*deleteLast*/ ctx[8], false, false, false, false)
-    				];
-
-    				mounted = true;
-    			}
     		},
-    		p: function update(ctx, [dirty]) {
-    			if (dirty & /*name*/ 1 && input0.value !== /*name*/ ctx[0]) {
-    				set_input_value(input0, /*name*/ ctx[0]);
-    			}
-
-    			if (dirty & /*title*/ 2 && input1.value !== /*title*/ ctx[1]) {
-    				set_input_value(input1, /*title*/ ctx[1]);
-    			}
-
-    			if (dirty & /*image*/ 4 && input2.value !== /*image*/ ctx[2]) {
-    				set_input_value(input2, /*image*/ ctx[2]);
-    			}
-
-    			if (dirty & /*description*/ 8) {
-    				set_input_value(textarea, /*description*/ ctx[3]);
-    			}
-
-    			if (current_block_type !== (current_block_type = select_block_type(ctx))) {
-    				if_block.d(1);
-    				if_block = current_block_type(ctx);
-
-    				if (if_block) {
-    					if_block.c();
-    					if_block.m(t18.parentNode, t18);
-    				}
-    			}
-
-    			if (dirty & /*createContacts*/ 32) {
-    				each_value = /*createContacts*/ ctx[5];
-    				validate_each_argument(each_value);
-    				group_outros();
-    				validate_each_keys(ctx, each_value, get_each_context, get_key);
-    				each_blocks = update_keyed_each(each_blocks, dirty, get_key, 1, ctx, each_value, each_1_lookup, each_1_anchor.parentNode, outro_and_destroy_block, create_each_block, each_1_anchor, get_each_context);
-    				check_outros();
-
-    				if (!each_value.length && each_1_else) {
-    					each_1_else.p(ctx, dirty);
-    				} else if (!each_value.length) {
-    					each_1_else = create_else_block(ctx);
-    					each_1_else.c();
-    					each_1_else.m(each_1_anchor.parentNode, each_1_anchor);
-    				} else if (each_1_else) {
-    					each_1_else.d(1);
-    					each_1_else = null;
-    				}
-    			}
-    		},
+    		p: noop,
     		i: function intro(local) {
     			if (current) return;
+    			transition_in(header.$$.fragment, local);
 
     			for (let i = 0; i < each_value.length; i += 1) {
     				transition_in(each_blocks[i]);
@@ -1220,6 +715,9 @@ var app = (function () {
     			current = true;
     		},
     		o: function outro(local) {
+    			transition_out(header.$$.fragment, local);
+    			each_blocks = each_blocks.filter(Boolean);
+
     			for (let i = 0; i < each_blocks.length; i += 1) {
     				transition_out(each_blocks[i]);
     			}
@@ -1227,25 +725,10 @@ var app = (function () {
     			current = false;
     		},
     		d: function destroy(detaching) {
-    			if (detaching) detach_dev(div4);
-    			if (detaching) detach_dev(t11);
-    			if (detaching) detach_dev(button0);
-    			if (detaching) detach_dev(t13);
-    			if (detaching) detach_dev(button1);
-    			if (detaching) detach_dev(t15);
-    			if (detaching) detach_dev(button2);
-    			if (detaching) detach_dev(t17);
-    			if_block.d(detaching);
-    			if (detaching) detach_dev(t18);
-
-    			for (let i = 0; i < each_blocks.length; i += 1) {
-    				each_blocks[i].d(detaching);
-    			}
-
-    			if (detaching) detach_dev(each_1_anchor);
-    			if (each_1_else) each_1_else.d(detaching);
-    			mounted = false;
-    			run_all(dispose);
+    			destroy_component(header, detaching);
+    			if (detaching) detach_dev(t);
+    			if (detaching) detach_dev(section);
+    			destroy_each(each_blocks, detaching);
     		}
     	};
 
@@ -1263,40 +746,24 @@ var app = (function () {
     function instance($$self, $$props, $$invalidate) {
     	let { $$slots: slots = {}, $$scope } = $$props;
     	validate_slots('App', slots, []);
-    	let name = "Max";
-    	let title = "";
-    	let image = "";
-    	let description = "";
-    	let formState = 'empty';
-    	let createContacts = [];
 
-    	function addContact() {
-    		if (name.trim().length == 0 || title.trim().length == 0 || image.trim().length == 0 || description.trim().length == 0) {
-    			$$invalidate(4, formState = 'invalid');
-    			return;
+    	const meetups = [
+    		{
+    			id: 'm1',
+    			title: 'COding Bootcamp',
+    			subtitle: 'Learn Hard',
+    			imageUrl: "https://i.namu.wiki/i/pcuapOq_pmNJ-l3XnG1-5y-FawoBIe9NV6Xs8n8s4l9NxmbdzN34XJxhpm1iy6uWMK2MMcxPtD9_S3Wv1HGQxw.webp",
+    			adrees: '부산광역시 어쩌구저쩌구',
+    			contactEmail: '111111.com'
+    		},
+    		{
+    			id: 'm2',
+    			title: 'C0ding Bootcamp',
+    			subtitle: 'Learn Hard! ! ! !',
+    			adrees: '부산광역시 어쩌구저쩌구',
+    			contactEmail: '1132231.com'
     		}
-
-    		$$invalidate(5, createContacts = [
-    			...createContacts,
-    			{
-    				id: Math.random(),
-    				name,
-    				jobTitle: title,
-    				imageUrl: image,
-    				desc: description
-    			}
-    		]);
-
-    		$$invalidate(4, formState = "done");
-    	}
-
-    	function deleteFirst() {
-    		$$invalidate(5, createContacts = createContacts.slice(1));
-    	}
-
-    	function deleteLast() {
-    		$$invalidate(5, createContacts = createContacts.slice(0, -1));
-    	}
+    	];
 
     	const writable_props = [];
 
@@ -1304,69 +771,8 @@ var app = (function () {
     		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<App> was created with unknown prop '${key}'`);
     	});
 
-    	function input0_input_handler() {
-    		name = this.value;
-    		$$invalidate(0, name);
-    	}
-
-    	function input1_input_handler() {
-    		title = this.value;
-    		$$invalidate(1, title);
-    	}
-
-    	function input2_input_handler() {
-    		image = this.value;
-    		$$invalidate(2, image);
-    	}
-
-    	function textarea_input_handler() {
-    		description = this.value;
-    		$$invalidate(3, description);
-    	}
-
-    	$$self.$capture_state = () => ({
-    		dirty_components,
-    		identity,
-    		ContactCard,
-    		name,
-    		title,
-    		image,
-    		description,
-    		formState,
-    		createContacts,
-    		addContact,
-    		deleteFirst,
-    		deleteLast
-    	});
-
-    	$$self.$inject_state = $$props => {
-    		if ('name' in $$props) $$invalidate(0, name = $$props.name);
-    		if ('title' in $$props) $$invalidate(1, title = $$props.title);
-    		if ('image' in $$props) $$invalidate(2, image = $$props.image);
-    		if ('description' in $$props) $$invalidate(3, description = $$props.description);
-    		if ('formState' in $$props) $$invalidate(4, formState = $$props.formState);
-    		if ('createContacts' in $$props) $$invalidate(5, createContacts = $$props.createContacts);
-    	};
-
-    	if ($$props && "$$inject" in $$props) {
-    		$$self.$inject_state($$props.$$inject);
-    	}
-
-    	return [
-    		name,
-    		title,
-    		image,
-    		description,
-    		formState,
-    		createContacts,
-    		addContact,
-    		deleteFirst,
-    		deleteLast,
-    		input0_input_handler,
-    		input1_input_handler,
-    		input2_input_handler,
-    		textarea_input_handler
-    	];
+    	$$self.$capture_state = () => ({ Header, MeetUpItemts: MeetUpItems, meetups });
+    	return [meetups];
     }
 
     class App extends SvelteComponentDev {
