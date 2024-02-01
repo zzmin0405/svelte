@@ -17,7 +17,8 @@
         subtitle:'Learn Hard',
         imageUrl:"https://i.namu.wiki/i/pcuapOq_pmNJ-l3XnG1-5y-FawoBIe9NV6Xs8n8s4l9NxmbdzN34XJxhpm1iy6uWMK2MMcxPtD9_S3Wv1HGQxw.webp",
         address:'부산광역시 어쩌구저쩌구',
-        contactEmail: '111111.com'
+        contactEmail: '111111.com',
+        isFavorite:false
         },
         {id:'m2',
         title: 'C0ding Bootcamp',
@@ -25,7 +26,8 @@
         imageUrl:"",
         description:"asdasdasdasdasd",
         address:'부산광역시 어쩌구저쩌구',
-        contactEmail: '1132231.com'
+        contactEmail: '1132231.com',
+        isFavorite:false
         }
     ];
     function addMeetup(){
@@ -39,6 +41,15 @@
             address:address
         };
         meetups = [newMeetup,...meetups];
+    }
+    function toggleFavorite(event){
+        const id = event.detail;
+        const updatedMeetup = {...meetups.find(m=> m.id === id)};
+        updatedMeetup.isFavorite = !updatedMeetup.isFavorite;
+        const meetupIndex = meetups.findIndex(m =>m.id ===id);
+        const updatedMeetups = [...meetups];
+        updatedMeetups[meetupIndex]= updatedMeetup;
+        meetups = updatedMeetups;
     }
 </script>
 <style>
@@ -56,17 +67,15 @@
     <form on:submit|preventDefault="{addMeetup}">
         <TextInput id="title" 
         label="Title" 
-        type="text"
         value={title}
         on:input="{event=> (title = event.target.value)}"/>
         <TextInput id="subtitle" 
         label="Subtitle" 
-        type ="text"
+
         value={subtitle}
         on:input="{event=>(subtitle = event.target.value)}"/>
         <TextInput id="address" 
         label="Address" 
-        type="text"
         value={address}
         on:input="{event=>(address = event.target.value)}"/>
         <TextInput id="imageUrl" 
@@ -85,5 +94,5 @@
         on:input="{event=> (description = event.target.value)}"/>
         <Button type="submit" caption="Save"/>
         </form>
-    <MeetupGrid {meetups} />
+    <MeetupGrid {meetups} on:togglefavorite="{toggleFavorite}" />
 </main>
