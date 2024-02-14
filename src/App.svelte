@@ -71,4 +71,5 @@
     <EditMeetup on:save="{addMeetup}" on:cancel={cancelEdit}/>
     {/if}
     <MeetupGrid {meetups} on:togglefavorite="{toggleFavorite}" />
+
 </main>
