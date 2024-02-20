@@ -211,6 +211,9 @@ var app = (function () {
     function add_render_callback(fn) {
         render_callbacks.push(fn);
     }
+    function add_flush_callback(fn) {
+        flush_callbacks.push(fn);
+    }
     // flush() calls callbacks in this order:
     // 1. All beforeUpdate callbacks, in order: parents before children
     // 2. All bind:this callbacks, in reverse order: children before parents.
@@ -339,6 +342,14 @@ var app = (function () {
         }
         else if (callback) {
             callback();
+        }
+    }
+
+    function bind(component, name, callback) {
+        const index = component.$$.props[name];
+        if (index !== undefined) {
+            component.$$.bound[index] = callback;
+            callback(component.$$.ctx[index]);
         }
     }
     function create_component(block) {
@@ -2736,6 +2747,7 @@ var app = (function () {
     	let textinput4;
     	let t4;
     	let textinput5;
+    	let updating_value;
     	let current;
     	let mounted;
     	let dispose;
@@ -2806,19 +2818,24 @@ var app = (function () {
 
     	textinput4.$on("input", /*input_handler_4*/ ctx[19]);
 
-    	textinput5 = new TextInput({
-    			props: {
-    				id: "description",
-    				label: "Description",
-    				valid: /*descriptionValid*/ ctx[12],
-    				validityMessage: "Please enter a valid description.",
-    				value: /*description*/ ctx[4],
-    				controlType: "textarea"
-    			},
-    			$$inline: true
-    		});
+    	function textinput5_value_binding(value) {
+    		/*textinput5_value_binding*/ ctx[20](value);
+    	}
 
-    	textinput5.$on("input", /*input_handler_5*/ ctx[20]);
+    	let textinput5_props = {
+    		id: "description",
+    		label: "Description",
+    		valid: /*descriptionValid*/ ctx[12],
+    		validityMessage: "Please enter a valid description.",
+    		controlType: "textarea"
+    	};
+
+    	if (/*description*/ ctx[4] !== void 0) {
+    		textinput5_props.value = /*description*/ ctx[4];
+    	}
+
+    	textinput5 = new TextInput({ props: textinput5_props, $$inline: true });
+    	binding_callbacks.push(() => bind(textinput5, 'value', textinput5_value_binding));
 
     	const block = {
     		c: function create() {
@@ -2880,7 +2897,13 @@ var app = (function () {
     			textinput4.$set(textinput4_changes);
     			const textinput5_changes = {};
     			if (dirty & /*descriptionValid*/ 4096) textinput5_changes.valid = /*descriptionValid*/ ctx[12];
-    			if (dirty & /*description*/ 16) textinput5_changes.value = /*description*/ ctx[4];
+
+    			if (!updating_value && dirty & /*description*/ 16) {
+    				updating_value = true;
+    				textinput5_changes.value = /*description*/ ctx[4];
+    				add_flush_callback(() => updating_value = false);
+    			}
+
     			textinput5.$set(textinput5_changes);
     		},
     		i: function intro(local) {
@@ -3019,7 +3042,7 @@ var app = (function () {
     			t = space();
     			create_component(button1.$$.fragment);
     			attr_dev(div, "slot", "footer");
-    			add_location(div, file$1, 86, 4, 2652);
+    			add_location(div, file$1, 86, 4, 2602);
     		},
     		m: function mount(target, anchor) {
     			insert_dev(target, div, anchor);
@@ -3181,7 +3204,11 @@ var app = (function () {
     	const input_handler_2 = event => $$invalidate(2, address = event.target.value);
     	const input_handler_3 = event => $$invalidate(5, imageUrl = event.target.value);
     	const input_handler_4 = event => $$invalidate(3, email = event.target.value);
-    	const input_handler_5 = event => $$invalidate(4, description = event.target.value);
+
+    	function textinput5_value_binding(value) {
+    		description = value;
+    		$$invalidate(4, description);
+    	}
 
     	function cancel_handler(event) {
     		bubble.call(this, $$self, event);
@@ -3283,7 +3310,7 @@ var app = (function () {
     		input_handler_2,
     		input_handler_3,
     		input_handler_4,
-    		input_handler_5,
+    		textinput5_value_binding,
     		cancel_handler
     	];
     }

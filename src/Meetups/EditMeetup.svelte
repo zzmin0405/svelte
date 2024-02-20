@@ -76,11 +76,11 @@
     value={email}
     type = "email"
     on:input="{event=> (email = event.target.value)}"/>
-    <TextInput id="description" 
+    <TextInput 
+    id="description" 
     label="Description" 
     valid={descriptionValid}
     validityMessage="Please enter a valid description."
-    value={description}
     controlType="textarea"
     bind:value={description}/>
 </form>
