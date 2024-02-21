@@ -5,28 +5,31 @@
     import TextInput from "./UI/TextInput.svelte";
     import Button from "./UI/Button.svelte";
     import EditMeetup from'./Meetups/EditMeetup.svelte';
-    let loadedmeetups = meetups
-    let editMode;
+    import MeetupDetail from "./Meetups/MeetupDetail.svelte";
 
+    let editMode;
+    let page = 'overview';
+    let pageData = {};
+    let editedId;
     function cancelEdit(){
         editMode=null;
+        editedId=null;
     }
-    function addMeetup(event){
-        const meetupData ={
-            id:Math.random().toString(),
-            title:event.detail.title,
-            subtitle:event.detail.subtitle,
-            description:event.detail.description,
-            imageUrl:event.detail.imageUrl,
-            contactEmail:event.detail.email,
-            address:event.detail.address
-        };
-        loadedmeetups.addMeetup(meetupData);
+    function savedMeetup(event){
+        editedId=null;
         editMode = null;
     }
-    function toggleFavorite(event){
-        const id = event.detail;
-        meetups.toogleFavorite(id);
+    function showDetails(event){
+        page='details';
+        pageData.id=event.detail;
+    }
+    function closeDetail(){
+        page = 'overview';
+        pageData ={};
+    }
+    function startEdit (event) {
+        editMode = 'edit';
+        editedId = event.detail;
     }
 </script>
 <style>
@@ -39,12 +42,15 @@
 </style>
 <Header />
 <main>
+{#if page ==='overview'}
     <div class="meetup-controls">
-        <Button c on:click="{()=>editMode = 'add'}">New Meetup</Button>
+        <Button c on:click="{()=>editMode = 'edit'}">New Meetup</Button>
     </div>
-    {#if editMode ==='add'}
-    <EditMeetup on:save="{addMeetup}" on:cancel={cancelEdit}/>
+    {#if editMode ==='edit'}
+    <EditMeetup id={editedId} on:save="{savedMeetup}" on:cancel={cancelEdit}/>
     {/if}
-    <MeetupGrid meetups={$meetups} on:togglefavorite="{toggleFavorite}" />
-
+    <MeetupGrid meetups={$meetups} on:showdetails={showDetails} on:edit="{startEdit}"/>
+{:else}
+    <MeetupDetail id={pageData.id} on:close={closeDetail}/>
+{/if}
 </main>

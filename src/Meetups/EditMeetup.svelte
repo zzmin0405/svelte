@@ -1,15 +1,31 @@
 <script>
+    import meetups from './meetup-store.js'
     import {createEventDispatcher} from 'svelte'
     import TextInput from '../UI/TextInput.svelte';
     import Button from '../UI/Button.svelte';
     import Modal from '../UI/Modal.svelte';
     import { isEmpty,isValidEmail} from "../helpers/validation";
+    export let id = null;
     let title="";
     let subtitle="";
     let address="";
     let email="";
     let description="";
     let imageUrl="";
+
+    if(id){
+    const unsubscribe = meetups.subscribe(items=>{
+        const selectedMeetup = items.find(i => i.id === id);
+        title = selectedMeetup.title;
+        subtitle = selectedMeetup.subtitle;
+        address = selectedMeetup.address;
+        description = selectedMeetup.description;
+        email = selectedMeetup.email;
+        imageUrl = selectedMeetup.imageUrl;
+    });
+    unsubscribe();
+    }
+
     const dispatch = createEventDispatcher();
     function cancel(){
         dispatch('cancel');
@@ -25,15 +41,22 @@
 
 
     function submitForm(){
-        dispatch('save',{
+        const meetupData ={
+            id:Math.random().toString(),
             title:title,
             subtitle:subtitle,
-            address:address,
-            email:email,
             description:description,
-            imageUrl:imageUrl
-
-        });
+            imageUrl:imageUrl,
+            contactEmail:email,
+            address:address
+        };
+        if(id){
+            meetups.updatedMeetup(id, meetupData);
+        }
+        else{
+            meetups.addMeetup(meetupData);
+        }
+        dispatch('save');
     }
 </script>
 <style>
