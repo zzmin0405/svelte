@@ -16,7 +16,8 @@ const meetups = writable([
     id: "m2",
     title: "C0ding Bootcamp",
     subtitle: "Learn Hard! ! ! !",
-    imageUrl: "",
+    imageUrl:
+      "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQceDNPZFn8Y9fTrJ3LvVafCFSNpECSH83xo0Ar1ChdIEcGfT1ze0t-QJzxfERd_fBRGsQ&usqp=CAU",
     description: "asdasdasdasdasd",
     address: "부산광역시 어쩌구저쩌구",
     contactEmail: "1132231.com",
@@ -35,7 +36,7 @@ const customMeetupsStore = {
       return [newMeetup, ...items];
     });
   },
-  updatedMeetup: (id, meetupData) => {
+  updateMeetup: (id, meetupData) => {
     meetups.update((items) => {
       const meetupIndex = items.findIndex((i) => i.id === id);
       const updatedMeetup = { ...items[meetupIndex], ...meetupData };

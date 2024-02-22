@@ -44,7 +44,7 @@
 <main>
 {#if page ==='overview'}
     <div class="meetup-controls">
-        <Button c on:click="{()=>editMode = 'edit'}">New Meetup</Button>
+        <Button on:click="{()=>editMode = 'edit'}">New Meetup</Button>
     </div>
     {#if editMode ==='edit'}
     <EditMeetup id={editedId} on:save="{savedMeetup}" on:cancel={cancelEdit}/>
