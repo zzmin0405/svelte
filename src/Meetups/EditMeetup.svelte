@@ -45,6 +45,10 @@
       imageUrlValid &&
       emailValid;
   
+    function deleteMeetup(){
+        meetups.removeMeetup(id);
+        dispatch('save');
+    }
     function submitForm() {
       const meetupData = {
         title: title,
@@ -126,6 +130,9 @@
       <Button type="button" on:click={submitForm} disabled={!formIsValid}>
         Save
       </Button>
+      {#if id}
+      <Button type="button" on:click={deleteMeetup}>Delete</Button>
+      {/if}
     </div>
   </Modal>
   

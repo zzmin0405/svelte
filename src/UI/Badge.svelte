@@ -1,3 +1,6 @@
+<script>
+    import {fly} from 'svelte/transition';
+</script>
 <style>
     span{
         display: inline-block;
@@ -11,6 +14,6 @@
         font-size: 0.8rem;
     }
 </style>
-<span>
+<span transition:fly ={{x:10}}>
     <slot/>
 </span>

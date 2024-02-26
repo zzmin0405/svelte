@@ -3,6 +3,7 @@
   import meetups from './meetup-store.js'
   import Button from "../UI/Button.svelte";
   import Badge from "../UI/Badge.svelte";
+  import {scale} from "svelte/transition";
   export let id;
   export let title;
   export let subtitle;
@@ -75,7 +76,7 @@
   }
 </style>
 
-<article>
+<article transition:scale>
   <header>
     <h1>
       {title} 

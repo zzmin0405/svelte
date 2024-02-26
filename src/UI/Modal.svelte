@@ -2,6 +2,7 @@
   import Button from "./Button.svelte";
     export let title;
     import {createEventDispatcher} from'svelte';
+    import {fade,fly} from 'svelte/transition';
     const dispatch = createEventDispatcher();
 
     function closeModal(){
@@ -9,6 +10,21 @@
     }
 </script>
 <style>
+  .section::-webkit-scrollbar {
+   width: 10px;
+   }
+
+   /* Track */
+   .section::-webkit-scrollbar-track {
+   box-shadow: inset 0 0 2px grey; 
+   border-radius: 3px;
+   }
+
+   /* Handle */
+   .section::-webkit-scrollbar-thumb {
+   background: #4b4b4b; 
+   border-radius: 3px;
+   }
 .modal-backdrop {
   position: fixed;
   top: 0;
@@ -55,8 +71,8 @@ footer {
 }
 
 </style>
-<div class="modal-backdrop" on:click={closeModal}></div>
-<div class="modal">
+<div transition:fade class="modal-backdrop" on:click={closeModal}></div>
+<div  transition:fly={{y:60}} class="modal section">
     <h1>{title}</h1>
     <div class="content">
         <slot/>
