@@ -6,6 +6,7 @@
     import Modal from "../UI/Modal.svelte";
     import { isEmpty, isValidEmail } from "../helpers/validation.js";
   
+    const dispatch = createEventDispatcher();
     export let id = null;
   
     let title = "";
@@ -28,8 +29,6 @@
   
       unsubscribe();
     }
-  
-    const dispatch = createEventDispatcher();
   
     $: titleValid = !isEmpty(title);
     $: subtitleValid = !isEmpty(subtitle);
